@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TechShop.Application/TechShop.Application.csproj" />
+    <Project Path="src/TechShop.Domain/TechShop.Domain.csproj" />
+    <Project Path="src/TechShop.Infrastructure/TechShop.Infrastructure.csproj" />
+    <Project Path="src/TechShop.WinForms/TechShop.WinForms.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TechShop.QaHarness/TechShop.QaHarness.csproj" />
+  </Folder>
+</Solution>

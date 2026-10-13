@@ -1,0 +1,28 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+publish/
+
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## QA harness renders — regenerate with: dotnet run --project tests/TechShop.QaHarness -- --shots qa-screens
+qa-screens/
+
+## Local databases. TechShop keeps its own under %LOCALAPPDATA%\TechShop,
+## but these turn up if a tool is pointed at the repo.
+*.db
+*.db-shm
+*.db-wal
+design-time.db
+
+## OS noise
+Thumbs.db
+desktop.ini
+.DS_Store

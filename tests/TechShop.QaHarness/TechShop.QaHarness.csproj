@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>TechShop.QaHarness</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IsTestProject>true</IsTestProject>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!--
+      The harness reaches into the app's own screens and dialogs, which means it trips
+      the same designer-serialisation analyzer the UI project turns off, and it
+      deliberately swallows broad exceptions so one failing screen does not stop the run.
+    -->
+    <NoWarn>$(NoWarn);WFO1000;CA1031;CA1303;CA1812</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TechShop.Application\TechShop.Application.csproj" />
+    <ProjectReference Include="..\..\src\TechShop.Domain\TechShop.Domain.csproj" />
+    <ProjectReference Include="..\..\src\TechShop.Infrastructure\TechShop.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TechShop.WinForms\TechShop.WinForms.csproj" />
+  </ItemGroup>
+
+</Project>

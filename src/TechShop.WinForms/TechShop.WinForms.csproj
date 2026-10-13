@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>TechShop.WinForms</RootNamespace>
+    <AssemblyName>TechShop</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationDefaultFont>Segoe UI, 9pt</ApplicationDefaultFont>
+    <ApplicationUseCompatibleTextRendering>false</ApplicationUseCompatibleTextRendering>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!--
+      Every screen in this app is built in code; there are no .Designer.cs files and the
+      visual designer is never opened. WFO1000 asks each custom control property to declare
+      how the designer should serialise it, which is ceremony for a designer that does not
+      run here.
+    -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Krypton.Toolkit" Version="105.26.7.201" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechShop.Application\TechShop.Application.csproj" />
+    <ProjectReference Include="..\TechShop.Domain\TechShop.Domain.csproj" />
+    <ProjectReference Include="..\TechShop.Infrastructure\TechShop.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

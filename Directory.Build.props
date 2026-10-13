@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    CA1062 null-argument guards and CA1724/CA1711 naming rules fire constantly against a
+    layered app whose public surface is consumed only by its own UI project, and the
+    globalization rules want a culture on every ToString in a desktop app that is already
+    pinned to one culture. Turned off here rather than suppressed a hundred times.
+  -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1062;CA1724;CA1711;CA1716;CA1303;CA1308;CA1848;CA2007;CA1819</NoWarn>
+  </PropertyGroup>
+</Project>
