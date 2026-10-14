@@ -1,42 +1,70 @@
 using System.Drawing;
 using System.Drawing.Printing;
 using TechShop.Application.Features.Sales;
-using TechShop.Domain.Enums;
 using TechShop.WinForms.Controls;
 using TechShop.WinForms.Theming;
 
 namespace TechShop.WinForms.Features.Sales;
 
 /// <summary>
-/// One invoice, laid out the way it prints: shop at the top, customer, the lines, then
-/// the totals. The same layout is used on screen and on paper, so what the operator
-/// checks is what the customer receives.
+/// One invoice, laid out the way it prints, in whichever format is selected.
+///
+/// The counter prints an 80mm till roll and the office prints A4, so both are offered
+/// and the preview switches with the choice. What is on screen is what the printer gets:
+/// the same renderer draws both, so the preview cannot quietly disagree with the paper.
 /// </summary>
 public sealed class InvoiceDetailDialog : Form
 {
     private readonly InvoiceDetailDto _invoice;
+    private readonly Panel _sheet;
+    private readonly AppButton _a4;
+    private readonly AppButton _receipt;
 
-    public InvoiceDetailDialog(InvoiceDetailDto invoice)
+    private InvoiceFormat _format;
+
+    public InvoiceDetailDialog(InvoiceDetailDto invoice, InvoiceFormat format = InvoiceFormat.A4)
     {
         _invoice = invoice;
+        _format = format;
 
         Text = invoice.InvoiceNo;
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(640, 720);
-        MinimumSize = new Size(560, 520);
+        ClientSize = new Size(680, 760);
+        MinimumSize = new Size(560, 540);
         BackColor = Palette.AppBackground;
         Font = Typography.Body;
         ShowIcon = false;
         MinimizeBox = false;
 
-        var sheet = new Panel
+        _sheet = new Panel
         {
             Dock = DockStyle.Fill,
             BackColor = Palette.Surface,
             AutoScroll = true,
             Padding = new Padding(Metrics.Space6),
         };
-        sheet.Paint += (_, e) => Draw(e.Graphics, sheet.Width, forPrint: false);
+        _sheet.Paint += PaintSheet;
+        _sheet.Resize += (_, _) => ResizeSheet();
+
+        // A segmented choice rather than two print buttons: the operator picks the
+        // paper, checks it, then prints — instead of printing and finding out.
+        _a4 = Segment("A4 page", InvoiceFormat.A4);
+        _receipt = Segment("80mm receipt", InvoiceFormat.Receipt80);
+
+        var chooser = new Panel { Dock = DockStyle.Top, Height = 54, BackColor = Palette.Surface };
+        var chooserLabel = Theme.FieldLabel("Paper");
+        chooserLabel.Location = new Point(Metrics.Space6, Metrics.Space3);
+        chooser.Controls.AddRange([chooserLabel, _a4, _receipt]);
+        chooser.Resize += (_, _) =>
+        {
+            _a4.Location = new Point(Metrics.Space6 + 56, Metrics.Space2);
+            _receipt.Location = new Point(_a4.Right + Metrics.Space2, Metrics.Space2);
+        };
+        chooser.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Palette.BorderSubtle);
+            e.Graphics.DrawLine(pen, 0, chooser.Height - 1, chooser.Width, chooser.Height - 1);
+        };
 
         var print = new AppButton { Variant = ButtonVariant.Primary, Text = "Print", Width = 110 };
         print.Click += (_, _) => Print();
@@ -45,8 +73,7 @@ public sealed class InvoiceDetailDialog : Form
         close.Click += (_, _) => Close();
 
         var footer = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Palette.SurfaceSunken };
-        footer.Controls.Add(print);
-        footer.Controls.Add(close);
+        footer.Controls.AddRange([print, close]);
         footer.Resize += (_, _) =>
         {
             var y = (footer.Height - print.Height) / 2;
@@ -59,27 +86,140 @@ public sealed class InvoiceDetailDialog : Form
             e.Graphics.DrawLine(pen, 0, 0, footer.Width, 0);
         };
 
-        Controls.Add(sheet);
+        Controls.Add(_sheet);
+        Controls.Add(chooser);
         Controls.Add(footer);
+
         CancelButton = close;
+        ApplyFormat(_format);
+    }
+
+    private AppButton Segment(string text, InvoiceFormat format)
+    {
+        var button = new AppButton { Variant = ButtonVariant.Secondary, Text = text, Height = Metrics.ControlHeightSmall };
+        button.FitToText(Metrics.Space3);
+        button.Click += (_, _) => ApplyFormat(format);
+        return button;
+    }
+
+    private void ApplyFormat(InvoiceFormat format)
+    {
+        _format = format;
+
+        _a4.Variant = format == InvoiceFormat.A4 ? ButtonVariant.Primary : ButtonVariant.Secondary;
+        _receipt.Variant = format == InvoiceFormat.Receipt80 ? ButtonVariant.Primary : ButtonVariant.Secondary;
+
+        _sheet.AutoScrollPosition = Point.Empty;
+        ResizeSheet();
+        _sheet.Invalidate();
+    }
+
+    private void PaintSheet(object? sender, PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var scroll = _sheet.AutoScrollPosition;
+
+        var available = _sheet.ClientSize.Width - _sheet.Padding.Horizontal;
+        var width = _format == InvoiceFormat.Receipt80
+            ? Math.Min(InvoiceRenderer.Receipt80Width, available)
+            : available;
+
+        // A receipt is narrower than the dialog, so it is centred on the sheet with the
+        // paper edges drawn — otherwise it reads as a broken layout rather than a roll.
+        var x = _sheet.Padding.Left + ((available - width) / 2) + scroll.X;
+        var y = _sheet.Padding.Top + scroll.Y;
+
+        if (_format == InvoiceFormat.Receipt80)
+        {
+            var height = InvoiceRenderer.Measure(_invoice, _format, width);
+            var paper = new Rectangle(x - Metrics.Space3, y - Metrics.Space3, width + (Metrics.Space3 * 2), height + (Metrics.Space3 * 2));
+
+            Render.FillRounded(g, paper, Metrics.RadiusSm, Palette.Surface);
+            Render.DrawRoundedBorder(g, paper, Metrics.RadiusSm, Palette.Border);
+        }
+
+        InvoiceRenderer.Draw(g, _invoice, _format, x, y, width);
+    }
+
+    /// <summary>
+    /// Works out how tall the scrollable area has to be.
+    ///
+    /// Deliberately not done inside the paint handler: assigning AutoScrollMinSize
+    /// triggers a layout, the layout triggers another paint, and the document ends up
+    /// drawn twice at two scroll offsets, overlapping itself.
+    /// </summary>
+    private void ResizeSheet()
+    {
+        if (_sheet.ClientSize.Width <= 0)
+        {
+            return;
+        }
+
+        var available = _sheet.ClientSize.Width - _sheet.Padding.Horizontal;
+        var width = _format == InvoiceFormat.Receipt80
+            ? Math.Min(InvoiceRenderer.Receipt80Width, available)
+            : available;
+
+        var height = InvoiceRenderer.Measure(_invoice, _format, width);
+        var wanted = new Size(0, height + _sheet.Padding.Vertical + Metrics.Space6);
+
+        if (_sheet.AutoScrollMinSize != wanted)
+        {
+            _sheet.AutoScrollMinSize = wanted;
+        }
+
+        // The document is centred, so widening the panel moves it. Without a full
+        // invalidate WinForms repaints only the newly exposed strip and the previous
+        // drawing stays behind, leaving the invoice rendered twice side by side.
+        _sheet.Invalidate();
     }
 
     private void Print()
     {
         using var document = new PrintDocument { DocumentName = _invoice.InvoiceNo };
+
+        if (_format == InvoiceFormat.Receipt80)
+        {
+            // A till roll is continuous, so the page is sized to the content. Left on a
+            // fixed page height the printer feeds, and then cuts, a strip of blank paper
+            // after every sale.
+            var height = InvoiceRenderer.Measure(_invoice, InvoiceFormat.Receipt80, InvoiceRenderer.Receipt80Width);
+
+            // Graphics units are 1/96in on screen and 1/100in on the page.
+            var paperHeight = (int)Math.Ceiling(height * 100d / 96d) + 20;
+
+            document.DefaultPageSettings.PaperSize =
+                new PaperSize("Receipt 80mm", InvoiceRenderer.Receipt80PaperWidth, paperHeight);
+            document.DefaultPageSettings.Margins = new Margins(10, 10, 10, 10);
+            document.OriginAtMargins = true;
+        }
+        else
+        {
+            document.DefaultPageSettings.PaperSize = new PaperSize("A4", 827, 1169);
+            document.DefaultPageSettings.Margins = new Margins(60, 60, 60, 60);
+        }
+
+        var format = _format;
+
         document.PrintPage += (_, e) =>
         {
-            if (e.Graphics is not null)
+            if (e.Graphics is null)
             {
-                Draw(e.Graphics, e.MarginBounds.Width + (Metrics.Space6 * 2), forPrint: true, e.MarginBounds.Left, e.MarginBounds.Top);
+                return;
             }
+
+            var bounds = format == InvoiceFormat.Receipt80
+                ? new Rectangle(0, 0, InvoiceRenderer.Receipt80Width, int.MaxValue)
+                : e.MarginBounds;
+
+            InvoiceRenderer.Draw(e.Graphics, _invoice, format, bounds.X, bounds.Y, bounds.Width);
         };
 
         using var preview = new PrintPreviewDialog
         {
             Document = document,
             StartPosition = FormStartPosition.CenterParent,
-            Width = 820,
+            Width = format == InvoiceFormat.Receipt80 ? 560 : 820,
             Height = 900,
         };
 
@@ -88,242 +228,19 @@ public sealed class InvoiceDetailDialog : Form
         preview.ShowDialog(this);
     }
 
-    /// <summary>
-    /// Draws the invoice. The same routine serves the screen and the printer, which is
-    /// why it takes an origin and a width rather than reading them off a control.
-    /// </summary>
-    private void Draw(Graphics g, int width, bool forPrint, int originX = 0, int originY = 0)
+    // ---------------------------------------------------------------- test seams
+
+    internal InvoiceFormat FormatForTest => _format;
+
+    internal void UseFormatForTest(InvoiceFormat format) => ApplyFormat(format);
+
+    /// <summary>The height the chosen format needs, so the QA harness can check it is sane.</summary>
+    internal int MeasureForTest(InvoiceFormat format)
     {
-        Render.UseQualityRendering(g);
+        var width = format == InvoiceFormat.Receipt80
+            ? InvoiceRenderer.Receipt80Width
+            : _sheet.ClientSize.Width - _sheet.Padding.Horizontal;
 
-        var left = originX + Metrics.Space6;
-        var right = originX + width - Metrics.Space6;
-        var y = originY + (forPrint ? 0 : Metrics.Space5);
-
-        var ink = Palette.InkStrong;
-        var muted = Palette.InkMuted;
-        var body = Palette.InkBody;
-
-        // ---- shop
-        y = Line(g, _invoice.ShopName, Typography.H3, ink, left, y, right - left) + 2;
-
-        if (!string.IsNullOrWhiteSpace(_invoice.ShopAddress))
-        {
-            y = Line(g, _invoice.ShopAddress, Typography.Get(Typography.SizeSm), muted, left, y, right - left);
-        }
-
-        if (!string.IsNullOrWhiteSpace(_invoice.ShopPhone))
-        {
-            y = Line(g, _invoice.ShopPhone, Typography.Get(Typography.SizeSm), muted, left, y, right - left);
-        }
-
-        y += Metrics.Space4;
-        y = Rule(g, left, right, y);
-        y += Metrics.Space3;
-
-        // ---- invoice meta, two columns
-        var metaTop = y;
-        Label(g, "Invoice", _invoice.InvoiceNo, left, ref y, 240);
-        Label(g, "Date", Format.DateTimeShort(_invoice.InvoiceDate), left, ref y, 240);
-        Label(g, "Raised by", _invoice.CreatedBy, left, ref y, 240);
-
-        var metaBottom = y;
-        y = metaTop;
-        var rightColumn = left + ((right - left) / 2);
-        Label(g, "Customer", _invoice.CustomerName, rightColumn, ref y, right - rightColumn);
-
-        if (!string.IsNullOrWhiteSpace(_invoice.CustomerPhone))
-        {
-            Label(g, "Phone", _invoice.CustomerPhone, rightColumn, ref y, right - rightColumn);
-        }
-
-        Label(g, "Payment", Format.Humanise(_invoice.PaymentMethod.ToString()), rightColumn, ref y, right - rightColumn);
-
-        y = Math.Max(metaBottom, y) + Metrics.Space3;
-
-        // A void invoice has to say so before anything else is read.
-        if (_invoice.Status == InvoiceStatus.Void)
-        {
-            var banner = new Rectangle(left, y, right - left, 42);
-            Render.FillRounded(g, banner, Metrics.RadiusMd, Palette.RoseSoft);
-            TextRenderer.DrawText(
-                g,
-                $"VOID  —  {_invoice.VoidReason}",
-                Typography.Get(Typography.SizeBase, FontStyle.Bold),
-                banner,
-                Palette.RoseText,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-            y = banner.Bottom + Metrics.Space3;
-        }
-
-        // ---- lines
-        var qtyX = right - 400;
-        var priceX = right - 330;
-        var taxX = right - 220;
-        var totalX = right - 120;
-
-        var headerRow = new Rectangle(left, y, right - left, 28);
-        Render.FillRounded(g, headerRow, Metrics.RadiusXs, Palette.SurfaceSunken);
-
-        Cell(g, "Item", Typography.Get(Typography.Size2Xs, FontStyle.Bold), muted, left + 8, y, qtyX - left - 16, 28, false);
-        Cell(g, "Qty", Typography.Get(Typography.Size2Xs, FontStyle.Bold), muted, qtyX, y, 60, 28, true);
-        Cell(g, Format.MoneyHeader("Price"), Typography.Get(Typography.Size2Xs, FontStyle.Bold), muted, priceX, y, 100, 28, true);
-        Cell(g, Format.MoneyHeader("Tax"), Typography.Get(Typography.Size2Xs, FontStyle.Bold), muted, taxX, y, 100, 28, true);
-        Cell(g, Format.MoneyHeader("Total"), Typography.Get(Typography.Size2Xs, FontStyle.Bold), muted, totalX, y, 112, 28, true);
-        y = headerRow.Bottom;
-
-        foreach (var item in _invoice.Items)
-        {
-            var rowHeight = 30;
-            Cell(g, $"{item.Sku}  {item.ProductName}", Typography.Get(Typography.SizeSm), body, left + 8, y, qtyX - left - 16, rowHeight, false);
-            Cell(g, Format.Qty(item.Qty), Typography.Numeric(Typography.SizeSm), body, qtyX, y, 60, rowHeight, true);
-            Cell(g, Format.Amount(item.UnitPrice), Typography.Numeric(Typography.SizeSm), body, priceX, y, 100, rowHeight, true);
-
-            // A dash, not 0.00: an exempt line and a line that happened to round to
-            // nothing are different things, and a customer may well ask which.
-            Cell(
-                g,
-                item.TaxAmount == 0m ? "—" : Format.Amount(item.TaxAmount),
-                Typography.Numeric(Typography.SizeSm),
-                body,
-                taxX,
-                y,
-                100,
-                rowHeight,
-                true);
-
-            Cell(g, Format.Amount(item.LineTotal), Typography.Numeric(Typography.SizeSm), ink, totalX, y, 112, rowHeight, true);
-
-            y += rowHeight;
-            using var pen = new Pen(Palette.BorderSubtle);
-            g.DrawLine(pen, left, y, right, y);
-        }
-
-        y += Metrics.Space4;
-
-        // ---- totals
-        Total(g, "Subtotal", _invoice.SubTotal, priceX, totalX, ref y, false);
-
-        if (_invoice.Discount > 0)
-        {
-            Total(g, "Discount", -_invoice.Discount, priceX, totalX, ref y, false);
-        }
-
-        if (_invoice.TaxTotal > 0)
-        {
-            Total(g, "Sales tax", _invoice.TaxTotal, priceX, totalX, ref y, false);
-        }
-
-        Total(g, "Total", _invoice.Total, priceX, totalX, ref y, true);
-        Total(g, "Paid", _invoice.PaidAmount, priceX, totalX, ref y, false);
-
-        if (_invoice.Outstanding > 0)
-        {
-            Total(g, "Outstanding", _invoice.Outstanding, priceX, totalX, ref y, true, Palette.DangerText);
-        }
-
-        if (!string.IsNullOrWhiteSpace(_invoice.Note))
-        {
-            y += Metrics.Space4;
-            y = Rule(g, left, right, y) + Metrics.Space2;
-            Line(g, _invoice.Note, Typography.Get(Typography.SizeSm), muted, left, y, right - left);
-        }
-    }
-
-    private static int Line(Graphics g, string text, Font font, Color colour, int x, int y, int width)
-    {
-        var size = TextRenderer.MeasureText(g, text, font, new Size(width, int.MaxValue), TextFormatFlags.WordBreak);
-        TextRenderer.DrawText(
-            g,
-            text,
-            font,
-            new Rectangle(x, y, width, size.Height),
-            colour,
-            TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
-        return y + size.Height;
-    }
-
-    private static void Label(Graphics g, string caption, string value, int x, ref int y, int width)
-    {
-        TextRenderer.DrawText(
-            g,
-            caption,
-            Typography.Get(Typography.Size2Xs, FontStyle.Bold),
-            new Rectangle(x, y, width, 14),
-            Palette.InkMuted,
-            TextFormatFlags.Left | TextFormatFlags.NoPrefix);
-
-        TextRenderer.DrawText(
-            g,
-            value,
-            Typography.Get(Typography.SizeBase),
-            new Rectangle(x, y + 14, width, 20),
-            Palette.Ink,
-            TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
-
-        y += 38;
-    }
-
-    private static void Cell(
-        Graphics g,
-        string text,
-        Font font,
-        Color colour,
-        int x,
-        int y,
-        int width,
-        int height,
-        bool rightAlign)
-        => TextRenderer.DrawText(
-            g,
-            text,
-            font,
-            new Rectangle(x, y, width, height),
-            colour,
-            (rightAlign ? TextFormatFlags.Right : TextFormatFlags.Left)
-            | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-
-    private static void Total(
-        Graphics g,
-        string label,
-        decimal value,
-        int labelX,
-        int valueX,
-        ref int y,
-        bool strong,
-        Color? colour = null)
-    {
-        var font = strong
-            ? Typography.Get(Typography.SizeMd, FontStyle.Bold)
-            : Typography.Get(Typography.SizeBase);
-
-        var numeric = strong
-            ? Typography.Numeric(Typography.SizeMd, FontStyle.Bold)
-            : Typography.Numeric(Typography.SizeBase);
-
-        TextRenderer.DrawText(
-            g,
-            label,
-            font,
-            new Rectangle(labelX - 60, y, 170, 26),
-            colour ?? (strong ? Palette.InkStrong : Palette.InkMuted),
-            TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-
-        TextRenderer.DrawText(
-            g,
-            Format.Amount(value),
-            numeric,
-            new Rectangle(valueX, y, 112, 26),
-            colour ?? Palette.InkStrong,
-            TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-
-        y += 26;
-    }
-
-    private static int Rule(Graphics g, int left, int right, int y)
-    {
-        using var pen = new Pen(Palette.Border);
-        g.DrawLine(pen, left, y, right, y);
-        return y + 1;
+        return InvoiceRenderer.Measure(_invoice, format, width);
     }
 }

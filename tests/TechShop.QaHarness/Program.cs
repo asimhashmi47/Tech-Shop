@@ -55,6 +55,7 @@ internal static class Program
             ScreenTests.Run(harness);
             InsertTests.RunAsync(harness).GetAwaiter().GetResult();
             TillTests.RunAsync(harness).GetAwaiter().GetResult();
+            PrintTests.RunAsync(harness, ScreenTests.ShotDirectory).GetAwaiter().GetResult();
             PermissionTests.RunAsync(harness, provider).GetAwaiter().GetResult();
             LoadTests.RunAsync(harness).GetAwaiter().GetResult();
         }

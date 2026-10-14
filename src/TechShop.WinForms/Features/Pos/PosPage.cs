@@ -747,7 +747,9 @@ public sealed class PosPage : PageBase
 
         if (Dialogs.Confirm(FindForm(), "Print receipt", $"Print {invoice.InvoiceNo}?"))
         {
-            using var receipt = new Sales.InvoiceDetailDialog(invoice);
+            // The counter prints a till roll. The office can switch to A4 in the
+            // dialog, but the default here is the paper actually in this printer.
+            using var receipt = new Sales.InvoiceDetailDialog(invoice, Sales.InvoiceFormat.Receipt80);
             receipt.ShowDialog(FindForm());
         }
 

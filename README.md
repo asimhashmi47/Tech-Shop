@@ -14,7 +14,7 @@ A shopkeeper running two or three branches needs the till, the stock on the shel
 - Touch-friendly till with barcode scanning or text search, and keyboard shortcuts (`F2` search, `F9` take payment)
 - **Per-line sales tax** — a basket can hold a taxable item and an exempt one, each taxed on its own merits
 - Cash, card, bank and credit, with live change due and part payment onto the customer account
-- Invoices with a print view, void with full stock reversal, and a receipt ledger per customer
+- Invoices print as an **80mm till roll or an A4 page**, with void and full stock reversal, and a receipt ledger per customer
 
 **Inventory**
 - Products with SKU, barcode, brand, category, cost, sale price, tax status and a reorder level
@@ -55,6 +55,19 @@ In the books, sales tax is money collected on behalf of the tax authority, so it
 | Profit and loss | Revenue is the invoice total **less** the tax charged on it |
 | Balance sheet | Tax collected appears as a liability, "Sales tax collected, not yet paid over" |
 | Receivables | **Gross** — a customer on credit owes the tax too |
+
+## Printing
+
+An invoice prints in two formats, chosen in the preview before anything reaches the printer:
+
+| | |
+|---|---|
+| **80mm receipt** | What the counter prints. Each item takes two lines — the name, then the arithmetic — because three columns will not fit across 80mm without truncating product names into uselessness. The page is sized to its content, so a till roll is not fed and cut with a strip of blank paper after every sale. |
+| **A4 page** | The office copy. Full item table with per-line tax, and the totals block. |
+
+The till defaults to the receipt and the Invoices screen defaults to A4, since that is the paper each one usually has loaded. One renderer draws both the preview and the paper, so what is checked on screen is what comes out.
+
+![Invoice formats](images/invoice-a4.png)
 
 ## Screens
 
@@ -170,7 +183,7 @@ dotnet run --project tests/TechShop.QaHarness
 
 It exits non-zero on any failure. Add `-- --shots qa-screens` to write a PNG of every screen at two window sizes, which is how the UI gets reviewed without a person sitting in front of the running app.
 
-Current run: **214 checks**, covering
+Current run: **222 checks**, covering
 
 - data integrity — stock reconciles with its movements, invoices reconcile with their lines, tax reconciles with its lines, no exempt product is ever taxed, no drawer goes negative
 - every screen loads and paints at desktop and laptop size, with assertions that grids are actually sized and nothing overflows the window
@@ -179,6 +192,7 @@ Current run: **214 checks**, covering
 - tax behaviour in the cart: the default follows the quantity, an override is never silently recalculated, and voiding a taxed invoice removes the liability it created
 - validation surfaces under the right field rather than being swallowed
 - permissions refused in the service layer, not just hidden in the menu
+- invoice printing in both formats, measured so a layout cannot run off the roll
 - load: 300 products and 250 sales inserted, then paging over ~1,000 invoices measured on the first page and the last
 
 Why it exists: a WinForms app compiles happily with a screen that throws the moment it is painted, and most of this app's drawing happens in `Paint` handlers that never run until something asks for pixels. Running the app by hand finds those one at a time.
