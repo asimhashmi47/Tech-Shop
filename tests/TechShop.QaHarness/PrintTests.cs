@@ -93,7 +93,10 @@ internal static class PrintTests
                     $"{invoice.Items.Count} items produced {height}px");
             }
 
-            using var bitmap = new Bitmap(dialog.ClientSize.Width, dialog.ClientSize.Height);
+            // Sized to the whole window, not the client area: DrawToBitmap paints the
+            // title bar too, so a client-sized bitmap loses that many pixels off the
+            // bottom — which is exactly where the footer buttons are.
+            using var bitmap = new Bitmap(dialog.Width, dialog.Height);
             dialog.DrawToBitmap(bitmap, new Rectangle(0, 0, bitmap.Width, bitmap.Height));
 
             harness.Pass($"{name}: renders");

@@ -132,6 +132,9 @@ public abstract class EditorForm : Form
 
         AcceptButton = _save;
         CancelButton = cancel;
+
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
     }
 
     protected Panel Footer { get; }

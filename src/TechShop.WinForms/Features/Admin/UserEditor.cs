@@ -50,8 +50,8 @@ public sealed class UserEditor : Form
 
         Text = existing is null ? "New user" : $"Edit {existing.Username}";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(880, 680);
-        MinimumSize = new Size(820, 600);
+        ClientSize = new Size(880, Math.Min(680, DialogSizing.MaxClientHeight(null)));
+        MinimumSize = new Size(820, 520);
         FormBorderStyle = FormBorderStyle.Sizable;
         BackColor = Palette.AppBackground;
         Font = Typography.Body;
@@ -189,6 +189,9 @@ public sealed class UserEditor : Form
         ApplyRole();
 
         CancelButton = cancel;
+
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
     }
 
     /// <summary>

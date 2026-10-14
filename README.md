@@ -183,7 +183,7 @@ dotnet run --project tests/TechShop.QaHarness
 
 It exits non-zero on any failure. Add `-- --shots qa-screens` to write a PNG of every screen at two window sizes, which is how the UI gets reviewed without a person sitting in front of the running app.
 
-Current run: **222 checks**, covering
+Current run: **270 checks**, covering
 
 - data integrity — stock reconciles with its movements, invoices reconcile with their lines, tax reconciles with its lines, no exempt product is ever taxed, no drawer goes negative
 - every screen loads and paints at desktop and laptop size, with assertions that grids are actually sized and nothing overflows the window
@@ -193,6 +193,7 @@ Current run: **222 checks**, covering
 - validation surfaces under the right field rather than being swallowed
 - permissions refused in the service layer, not just hidden in the menu
 - invoice printing in both formats, measured so a layout cannot run off the roll
+- every dialog opens inside the screen's working area, footer and all, checked against a 1366x768 laptop
 - load: 300 products and 250 sales inserted, then paging over ~1,000 invoices measured on the first page and the last
 
 Why it exists: a WinForms app compiles happily with a screen that throws the moment it is painted, and most of this app's drawing happens in `Paint` handlers that never run until something asks for pixels. Running the app by hand finds those one at a time.

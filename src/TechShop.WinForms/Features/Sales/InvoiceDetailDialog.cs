@@ -29,8 +29,11 @@ public sealed class InvoiceDetailDialog : Form
 
         Text = invoice.InvoiceNo;
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(680, 760);
-        MinimumSize = new Size(560, 540);
+        // Sized to fit a 1366x768 laptop, which is the smallest screen this is likely
+        // to meet on a shop counter. The sheet scrolls, so a long invoice does not need
+        // a taller window — and a taller window is one whose Print button is off-screen.
+        ClientSize = new Size(680, Math.Min(720, DialogSizing.MaxClientHeight(null)));
+        MinimumSize = new Size(560, 420);
         BackColor = Palette.AppBackground;
         Font = Typography.Body;
         ShowIcon = false;
@@ -91,6 +94,9 @@ public sealed class InvoiceDetailDialog : Form
         Controls.Add(footer);
 
         CancelButton = close;
+
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
         ApplyFormat(_format);
     }
 

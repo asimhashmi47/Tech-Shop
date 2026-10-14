@@ -57,8 +57,8 @@ public sealed class PurchaseBillEditor : Form
 
         Text = "New purchase bill";
         StartPosition = FormStartPosition.CenterParent;
-        ClientSize = new Size(960, 700);
-        MinimumSize = new Size(860, 600);
+        ClientSize = new Size(960, Math.Min(700, DialogSizing.MaxClientHeight(null)));
+        MinimumSize = new Size(860, 520);
         BackColor = Palette.AppBackground;
         Font = Typography.Body;
         ShowIcon = false;
@@ -223,6 +223,9 @@ public sealed class PurchaseBillEditor : Form
         Controls.Add(footer);
 
         CancelButton = cancel;
+
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
         Refresh();
     }
 

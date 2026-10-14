@@ -137,6 +137,9 @@ public sealed class LedgerDialog : Form
         Controls.Add(footer);
 
         CancelButton = close;
+
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
     }
 
     private static void Figure(Graphics g, int x, string label, decimal value)

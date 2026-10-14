@@ -121,6 +121,9 @@ public sealed class StockMovementsDialog : Form
         Controls.Add(footer);
 
         CancelButton = close;
+
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
         Shown += async (_, _) => await _grid.ReloadAsync().ConfigureAwait(true);
     }
 

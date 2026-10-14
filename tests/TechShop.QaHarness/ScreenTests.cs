@@ -91,8 +91,10 @@ internal static class ScreenTests
             host.PerformLayout();
             System.Windows.Forms.Application.DoEvents();
 
-            using var bitmap = new Bitmap(host.ClientSize.Width, host.ClientSize.Height);
-            host.DrawToBitmap(bitmap, new Rectangle(Point.Empty, host.ClientSize));
+            // The whole window, including its title bar: DrawToBitmap draws the chrome,
+            // so a client-sized bitmap silently crops the bottom of the page.
+            using var bitmap = new Bitmap(host.Width, host.Height);
+            host.DrawToBitmap(bitmap, new Rectangle(0, 0, bitmap.Width, bitmap.Height));
 
             if (ShotDirectory is not null)
             {

@@ -152,6 +152,9 @@ public sealed class PaymentDialog : Form
         AcceptButton = _confirm;
         CancelButton = cancel;
 
+        // Never taller or wider than the screen it opens on.
+        this.KeepOnScreen();
+
         Shown += (_, _) =>
         {
             _tendered.Focus();
