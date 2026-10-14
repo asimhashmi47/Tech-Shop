@@ -170,12 +170,13 @@ dotnet run --project tests/TechShop.QaHarness
 
 It exits non-zero on any failure. Add `-- --shots qa-screens` to write a PNG of every screen at two window sizes, which is how the UI gets reviewed without a person sitting in front of the running app.
 
-Current run: **205 checks**, covering
+Current run: **214 checks**, covering
 
 - data integrity — stock reconciles with its movements, invoices reconcile with their lines, tax reconciles with its lines, no exempt product is ever taxed, no drawer goes negative
 - every screen loads and paints at desktop and laptop size, with assertions that grids are actually sized and nothing overflows the window
 - inserts through each editor dialog, checking the row lands and every field round-trips
 - selling through the till end to end: cart, mixed-tax basket, discount, payment, stock, receipt, drawer
+- tax behaviour in the cart: the default follows the quantity, an override is never silently recalculated, and voiding a taxed invoice removes the liability it created
 - validation surfaces under the right field rather than being swallowed
 - permissions refused in the service layer, not just hidden in the menu
 - load: 300 products and 250 sales inserted, then paging over ~1,000 invoices measured on the first page and the last

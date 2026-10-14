@@ -180,7 +180,10 @@ internal static class TillTests
         // hands back, and getting it wrong costs the shop money at every sale.
         CheckChange(harness);
 
+        await CheckCartTaxBehaviourAsync(harness, till).ConfigureAwait(true);
+
         await MixedTaxBasketAsync(harness, sp, tillShopId).ConfigureAwait(true);
+        await TaxSurvivesVoidAndPaymentAsync(harness, sp, tillShopId).ConfigureAwait(true);
 
         session.ActiveShopId = null;
         till.Dispose();
@@ -308,6 +311,129 @@ internal static class TillTests
 
             throw new InvalidOperationException("a line with negative tax was accepted");
         }).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// The till's own tax rules: a default that follows the quantity, and an override
+    /// that does not get quietly recalculated out from under the operator.
+    /// </summary>
+    private static async Task CheckCartTaxBehaviourAsync(Harness harness, PosPage till)
+    {
+        harness.Section("tax behaviour in the cart");
+
+        till.ClearCartForTest();
+
+        // The shelf is still filtered to the SKU the earlier sale searched for, which
+        // leaves nothing exempt to add. Clear the search so the whole catalogue is back.
+        await till.SearchForTestAsync(string.Empty).ConfigureAwait(true);
+
+        if (till.LoadMixedBasketForTest() < 2)
+        {
+            harness.Fail("the cart can hold a mixed basket", "could not add a taxable and an exempt line");
+            return;
+        }
+
+        var taxable = till.LineTaxAtRateForTest(0) > 0m ? 0 : 1;
+        var exempt = taxable == 0 ? 1 : 0;
+
+        harness.Expect("a taxable line is taxed by default",
+            till.LineTaxForTest(taxable) == till.LineTaxAtRateForTest(taxable)
+            && till.LineTaxForTest(taxable) > 0m,
+            $"line tax is {till.LineTaxForTest(taxable)}");
+
+        harness.Expect("an exempt line is not taxed",
+            till.LineTaxForTest(exempt) == 0m,
+            $"exempt line carries {till.LineTaxForTest(exempt)}");
+
+        // Quantity up: an untouched line re-rates.
+        var atOne = till.LineTaxAtRateForTest(taxable);
+        till.SetLineQtyForTest(taxable, 3);
+
+        harness.Expect("tax follows the quantity while untouched",
+            till.LineTaxForTest(taxable) == till.LineTaxAtRateForTest(taxable)
+            && till.LineTaxForTest(taxable) > atOne,
+            $"tax is {till.LineTaxForTest(taxable)} at qty 3, rate says {till.LineTaxAtRateForTest(taxable)}");
+
+        // Override, then move the quantity again: the operator's figure must stand.
+        till.SetLineTaxForTest(taxable, 1m);
+        till.SetLineQtyForTest(taxable, 2);
+
+        harness.Expect("an overridden tax is not recalculated",
+            till.LineTaxForTest(taxable) == 1m,
+            $"the override became {till.LineTaxForTest(taxable)}");
+
+        harness.Expect("the cart total uses the overridden tax",
+            till.CartTax == 1m,
+            $"cart tax is {till.CartTax}");
+
+        // Zeroing tax on a taxable line is a legitimate override, not an error.
+        till.SetLineTaxForTest(taxable, 0m);
+        harness.Expect("tax can be overridden to nothing", till.CartTax == 0m,
+            $"cart tax is {till.CartTax} after zeroing the only taxed line");
+
+        till.ClearCartForTest();
+    }
+
+    /// <summary>
+    /// Tax through the rest of an invoice's life: a payment settles the tax-inclusive
+    /// total, and voiding removes the liability it created.
+    /// </summary>
+    private static async Task TaxSurvivesVoidAndPaymentAsync(Harness harness, IServiceProvider sp, long shopId)
+    {
+        var sales = sp.GetRequiredService<SalesService>();
+        var reports = sp.GetRequiredService<Application.Features.Reports.ReportService>();
+        var filter = new Application.Features.Reports.ReportFilter(shopId, null, null);
+
+        var recent = await sales.QueryAsync(new QueryRequest
+        {
+            ShopId = shopId,
+            PageSize = 60,
+            Sort = [new SortRule { Field = "invoiceDate", Desc = true }],
+        }).ConfigureAwait(true);
+
+        var candidate = recent.Items.FirstOrDefault(i => i.TaxTotal > 0m && i.Status != InvoiceStatus.Void);
+
+        if (candidate is null)
+        {
+            harness.Fail("a taxed invoice exists to void", "no live invoice carries tax");
+            return;
+        }
+
+        var before = await reports.BalanceSheetAsync(filter).ConfigureAwait(true);
+        await sales.VoidAsync(candidate.Id, new VoidInvoiceRequest("QA tax void")).ConfigureAwait(true);
+        var after = await reports.BalanceSheetAsync(filter).ConfigureAwait(true);
+
+        harness.Expect("voiding an invoice drops its tax from the liability",
+            Math.Abs((before.TaxPayable - after.TaxPayable) - candidate.TaxTotal) < 0.01m,
+            $"tax payable moved {before.TaxPayable} -> {after.TaxPayable}, invoice tax was {candidate.TaxTotal}");
+
+        harness.Expect("the balance sheet still balances after a void",
+            Math.Abs(after.TotalAssets - (after.TotalLiabilities + after.OwnerEquity)) < 0.01m,
+            "assets no longer equal liabilities plus equity");
+
+        var owing = recent.Items.FirstOrDefault(i =>
+            i.TaxTotal > 0m && i.Outstanding > 0m && i.Status != InvoiceStatus.Void && i.Id != candidate.Id);
+
+        if (owing is null)
+        {
+            return;
+        }
+
+        // The customer owes the tax too, so paying the outstanding figure clears it.
+        await sales.ReceiveAsync(new CreateCustomerPaymentRequest(
+            owing.ShopId,
+            owing.CustomerId,
+            owing.Id,
+            DateTime.UtcNow,
+            owing.Outstanding,
+            PaymentMethod.Cash,
+            "QA settle tax-inclusive")).ConfigureAwait(true);
+
+        var settled = await sales.GetAsync(owing.Id).ConfigureAwait(true);
+
+        harness.Expect("paying the outstanding figure clears a taxed invoice",
+            settled.Outstanding == 0m && settled.Status == InvoiceStatus.Paid,
+            $"outstanding {settled.Outstanding}, status {settled.Status}");
     }
 
     private static void CheckChange(Harness harness)

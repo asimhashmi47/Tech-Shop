@@ -80,6 +80,14 @@ internal static class ScreenTests
 
             // Let any continuation posted back to the UI thread actually run.
             System.Windows.Forms.Application.DoEvents();
+
+            // The till is worth seeing with something in the cart: an empty one shows
+            // none of the tax layout the screenshot is meant to review.
+            if (page is WinForms.Features.Pos.PosPage till)
+            {
+                till.LoadMixedBasketForTest();
+            }
+
             host.PerformLayout();
             System.Windows.Forms.Application.DoEvents();
 

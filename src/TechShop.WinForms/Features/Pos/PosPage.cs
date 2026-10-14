@@ -25,10 +25,13 @@ public sealed class PosPage : PageBase
     private readonly DataGridView _cart;
     private readonly KryptonComboBox _customer;
     private readonly KryptonNumericUpDown _discount;
-    private readonly Label _subTotalValue;
-    private readonly Label _taxLabel;
-    private readonly Label _taxValue;
-    private readonly Label _totalValue;
+    private readonly CartSummary _summary = new();
+
+    /// <summary>Width of the discount box, which shares the top row with the customer.</summary>
+    private const int DiscountWidth = 150;
+
+    /// <summary>Where the money block starts, under that shared row.</summary>
+    private const int SummaryTop = 76;
     private readonly AppButton _takePayment;
     private readonly AppButton _clear;
     private readonly Label _empty;
@@ -134,19 +137,6 @@ public sealed class PosPage : PageBase
         _discount = Theme.Numeric();
         _discount.ValueChanged += (_, _) => RefreshTotals();
 
-        _subTotalValue = Figure(Typography.SizeMd, Palette.InkBody);
-        _taxValue = Figure(Typography.SizeMd, Palette.InkBody);
-
-        _taxLabel = new Label
-        {
-            Text = "Tax",
-            AutoSize = true,
-            ForeColor = Palette.InkMuted,
-            Font = Typography.Get(Typography.Size2Xs, FontStyle.Bold),
-            BackColor = Color.Transparent,
-            Visible = false,
-        };
-        _totalValue = Figure(Typography.Size4Xl, Palette.InkStrong);
 
         _takePayment = new AppButton
         {
@@ -176,7 +166,7 @@ public sealed class PosPage : PageBase
             BackColor = Color.Transparent,
         };
         split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58f));
-        split.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 460f));
+        split.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 520f));
         split.Controls.Add(left, 0, 0);
         split.Controls.Add(right, 1, 0);
 
@@ -186,16 +176,6 @@ public sealed class PosPage : PageBase
         RefreshCart();
     }
 
-    private static Label Figure(float size, Color colour) => new()
-    {
-        AutoSize = false,
-        Height = size > 20 ? 56 : 28,
-        Dock = DockStyle.Top,
-        Font = Typography.Numeric(size, FontStyle.Bold),
-        ForeColor = colour,
-        TextAlign = ContentAlignment.MiddleRight,
-        BackColor = Color.Transparent,
-    };
 
     private Panel BuildCartPanel()
     {
@@ -203,75 +183,50 @@ public sealed class PosPage : PageBase
         card.Dock = DockStyle.Fill;
         card.Margin = new Padding(Metrics.Space4, 0, 0, 0);
 
-        var footer = new Panel { Dock = DockStyle.Bottom, Height = 250, BackColor = Color.Transparent };
+        var footer = new Panel { Dock = DockStyle.Bottom, BackColor = Color.Transparent };
 
+        // Customer and discount share a row. Stacked, they cost the cart seventy pixels
+        // of rows on a laptop screen, which is where the list of what is being sold
+        // matters most.
         var customerLabel = Theme.FieldLabel("Customer");
         customerLabel.Location = new Point(0, 4);
         _customer.Location = new Point(0, 24);
-        _customer.Width = 400;
 
         var discountLabel = Theme.FieldLabel(Format.MoneyHeader("Discount"));
-        discountLabel.Location = new Point(0, 72);
-        _discount.Location = new Point(0, 92);
-        _discount.Width = 180;
+        _discount.Width = DiscountWidth;
 
-        var subTotalLabel = new Label
+        _summary.Location = new Point(0, SummaryTop);
+
+        footer.Controls.AddRange([customerLabel, _customer, discountLabel, _discount, _summary]);
+
+        // One place decides every width and position here, so a caption can no longer
+        // drift away from the figure it belongs to.
+        void LayOutFooter()
         {
-            Text = "Subtotal",
-            AutoSize = true,
-            Location = new Point(210, 76),
-            ForeColor = Palette.InkMuted,
-            Font = Typography.Get(Typography.Size2Xs, FontStyle.Bold),
-            BackColor = Color.Transparent,
-        };
+            var width = footer.ClientSize.Width;
+            if (width <= 0)
+            {
+                return;
+            }
 
-        _subTotalValue.Dock = DockStyle.None;
-        _subTotalValue.Location = new Point(210, 92);
-        _subTotalValue.Width = 190;
+            _customer.Width = Math.Max(140, width - DiscountWidth - Metrics.Space4);
 
-        _taxLabel.Location = new Point(0, 114);
+            discountLabel.Location = new Point(width - DiscountWidth, 4);
+            _discount.Location = new Point(width - DiscountWidth, 24);
 
-        _taxValue.Dock = DockStyle.None;
-        _taxValue.Location = new Point(210, 110);
-        _taxValue.Width = 190;
-        _taxValue.Visible = false;
+            _summary.Width = width;
+            _summary.Location = new Point(0, SummaryTop);
 
-        // Right aligned so the label sits over its figure rather than at the far side
-        // of the panel from it.
-        var totalLabel = new Label
-        {
-            Text = "TOTAL",
-            AutoSize = false,
-            Height = 16,
-            Location = new Point(0, 136),
-            TextAlign = ContentAlignment.MiddleRight,
-            ForeColor = Palette.InkMuted,
-            Font = Typography.Get(Typography.Size2Xs, FontStyle.Bold),
-            BackColor = Color.Transparent,
-        };
+            var wanted = SummaryTop + _summary.Height + Metrics.Space2;
+            if (footer.Height != wanted)
+            {
+                footer.Height = wanted;
+            }
+        }
 
-        _totalValue.Dock = DockStyle.None;
-        _totalValue.Location = new Point(0, 152);
-        _totalValue.Width = 400;
-
-        footer.Controls.AddRange(
-        [
-            customerLabel, _customer,
-            discountLabel, _discount,
-            subTotalLabel, _subTotalValue,
-            _taxLabel, _taxValue,
-            totalLabel, _totalValue,
-        ]);
-
-        footer.Resize += (_, _) =>
-        {
-            _customer.Width = footer.Width;
-            _totalValue.Width = footer.Width;
-            totalLabel.Width = footer.Width;
-            _subTotalValue.Location = new Point(footer.Width - 190, 92);
-            _taxLabel.Location = new Point(0, 114);
-            _taxValue.Location = new Point(footer.Width - 190, 110);
-        };
+        footer.Resize += (_, _) => LayOutFooter();
+        _summary.Resize += (_, _) => LayOutFooter();
+        LayOutFooter();
 
         var toolbar = new Panel { Dock = DockStyle.Top, Height = 36, BackColor = Color.Transparent };
         var cartHeading = new Label
@@ -343,7 +298,7 @@ public sealed class PosPage : PageBase
         {
             Name = "qty",
             HeaderText = "Qty",
-            Width = 60,
+            Width = 52,
             SortMode = DataGridViewColumnSortMode.NotSortable,
         };
         qty.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
@@ -356,7 +311,7 @@ public sealed class PosPage : PageBase
         {
             Name = "tax",
             HeaderText = Format.MoneyHeader("Tax"),
-            Width = 90,
+            Width = 104,
             SortMode = DataGridViewColumnSortMode.NotSortable,
         };
         tax.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
@@ -366,7 +321,7 @@ public sealed class PosPage : PageBase
         {
             Name = "total",
             HeaderText = Format.MoneyHeader("Total"),
-            Width = 110,
+            Width = 118,
             ReadOnly = true,
             SortMode = DataGridViewColumnSortMode.NotSortable,
         };
@@ -379,7 +334,7 @@ public sealed class PosPage : PageBase
             HeaderText = string.Empty,
             Text = "✕",
             UseColumnTextForButtonValue = true,
-            Width = 40,
+            Width = 34,
             FlatStyle = FlatStyle.Flat,
             SortMode = DataGridViewColumnSortMode.NotSortable,
         };
@@ -687,8 +642,8 @@ public sealed class PosPage : PageBase
 
         foreach (var line in _lines)
         {
-            _cart.Rows.Add(
-                $"{line.Sku}  {line.Name}",
+            var row = _cart.Rows.Add(
+                line.Name,
                 line.Qty.ToString(System.Globalization.CultureInfo.CurrentCulture),
 
                 // An exempt line shows a dash rather than 0.00, so "no tax applies" is
@@ -696,6 +651,14 @@ public sealed class PosPage : PageBase
                 line.IsTaxable ? Format.Amount(line.TaxAmount) : "—",
                 Format.Amount(line.LineTotalWithTax),
                 "✕");
+
+            // The name is ellipsised in a narrow cart, so the full identity — including
+            // the SKU, which is no longer a column — stays reachable on hover.
+            _cart.Rows[row].Cells[0].ToolTipText = $"{line.Sku}  {line.Name}";
+
+            _cart.Rows[row].Cells[2].ToolTipText = line.IsTaxable
+                ? $"Tax at {line.TaxRate:0.##}% is {Format.Money(line.TaxAtRate)}. Type to override."
+                : "This product is exempt from sales tax.";
         }
 
         RefreshTotals();
@@ -715,14 +678,8 @@ public sealed class PosPage : PageBase
         var tax = _lines.Sum(l => l.TaxAmount);
         var total = subTotal - discount + tax;
 
-        _subTotalValue.Text = Format.Amount(subTotal);
-        _taxValue.Text = Format.Amount(tax);
+        _summary.Show(subTotal, discount, tax, _lines.Any(l => l.IsTaxable));
 
-        // Only worth the room when some line actually carries tax.
-        _taxLabel.Visible = tax > 0m;
-        _taxValue.Visible = tax > 0m;
-
-        _totalValue.Text = Format.Money(total);
         _takePayment.Enabled = _lines.Count > 0 && ActiveShopId is not null;
     }
 
@@ -866,6 +823,69 @@ public sealed class PosPage : PageBase
     /// True when a row of tiles uses the shelf width with less than one tile of slack
     /// left over. This is what the "two columns and a blank strip" report was.
     /// </summary>
+    /// <summary>
+    /// Fills the cart with one taxable line and one exempt line, so the screenshot pass
+    /// and the QA checks see the mixed basket the tax feature exists for rather than an
+    /// empty cart.
+    /// </summary>
+    internal int LoadMixedBasketForTest()
+    {
+        var added = 0;
+
+        foreach (var tile in _results.Controls.OfType<ProductTile>())
+        {
+            var wantTaxable = added == 0;
+
+            if (tile.IsTaxableForTest == wantTaxable && tile.InStockForTest)
+            {
+                tile.PickForTest();
+
+                if (_lines.Count > added)
+                {
+                    added++;
+                }
+
+                if (added == 2)
+                {
+                    break;
+                }
+            }
+        }
+
+        return added;
+    }
+
+    /// <summary>Overrides a line's tax the way typing into the Tax cell does.</summary>
+    internal void SetLineTaxForTest(int index, decimal amount)
+    {
+        _lines[index] = _lines[index] with { TaxAmount = amount };
+        RefreshCart();
+    }
+
+    /// <summary>Changes a line's quantity the way editing the Qty cell does.</summary>
+    internal void SetLineQtyForTest(int index, int qty)
+    {
+        var line = _lines[index];
+        var changed = line with { Qty = qty };
+
+        _lines[index] = line.TaxAmount == line.TaxAtRate
+            ? changed with { TaxAmount = changed.TaxAtRate }
+            : changed;
+
+        RefreshCart();
+    }
+
+    internal decimal LineTaxForTest(int index) => _lines[index].TaxAmount;
+
+    internal decimal LineTaxAtRateForTest(int index) => _lines[index].TaxAtRate;
+
+    internal void ClearCartForTest()
+    {
+        _lines.Clear();
+        _discount.Value = 0m;
+        RefreshCart();
+    }
+
     internal bool TilesFillWidthForTest()
     {
         var tiles = _results.Controls.OfType<ProductTile>().ToList();

@@ -91,6 +91,10 @@ public sealed class ProductTile : Control
         base.OnClick(e);
     }
 
+    internal bool IsTaxableForTest => _product.IsTaxable;
+
+    internal bool InStockForTest => InStock;
+
     /// <summary>Picks this tile as a tap would, for the QA harness.</summary>
     internal void PickForTest()
     {
