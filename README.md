@@ -6,7 +6,7 @@ Repository: <https://github.com/asimhashmi47/Tech-Shop>
 
 A shopkeeper running two or three branches needs the till, the stock on the shelf and the books to agree with each other. TechShop keeps them in one SQLite file: a sale at the counter moves stock, raises an invoice, posts to the customer account and lands in the cash drawer, and the balance sheet that comes out at the end is one that actually balances.
 
-![TechShop dashboard](images/dashboard.png)
+![TechShop dashboard](images/02-dashboard.png)
 
 ## What it does
 
@@ -67,7 +67,7 @@ An invoice prints in two formats, chosen in the preview before anything reaches 
 
 The till defaults to the receipt and the Invoices screen defaults to A4, since that is the paper each one usually has loaded. One renderer draws both the preview and the paper, so what is checked on screen is what comes out.
 
-![Invoice formats](images/invoice-a4.png)
+![Invoice on A4](images/17-invoice-a4.png)
 
 ## Screens
 
@@ -82,7 +82,18 @@ The till defaults to the receipt and the Invoices screen defaults to A4, since t
 | Reports | Period summary, profit and loss, balance sheet, cash flow |
 | Shops, Users, Settings, Audit log | Admin, including the per-module permission matrix |
 
-![Point of sale](images/point-of-sale.png)
+Every screen is in [`images/`](images/), captured from the running application:
+
+| | | |
+|---|---|---|
+| [Sign in](images/01-login.png) | [Dashboard](images/02-dashboard.png) | [Point of sale](images/03-point-of-sale.png) |
+| [Invoices](images/04-invoices.png) | [Customers](images/05-customers.png) | [Products](images/06-products.png) |
+| [Stock](images/07-stock.png) | [Suppliers](images/08-suppliers.png) | [Purchases](images/09-purchases.png) |
+| [Expenses](images/10-expenses.png) | [Petty cash](images/11-petty-cash.png) | [Reports](images/12-reports.png) |
+| [Shops](images/13-shops.png) | [Users](images/14-users.png) | [Audit log](images/15-audit-log.png) |
+| [Settings](images/16-settings.png) | [Invoice, A4](images/17-invoice-a4.png) | [Invoice, 80mm](images/18-invoice-receipt-80mm.png) |
+
+![Point of sale](images/03-point-of-sale.png)
 
 ## Tech stack
 
@@ -181,9 +192,12 @@ The app ships with a headless QA harness. It builds the real DI container agains
 dotnet run --project tests/TechShop.QaHarness
 ```
 
-It exits non-zero on any failure. Add `-- --shots qa-screens` to write a PNG of every screen at two window sizes, which is how the UI gets reviewed without a person sitting in front of the running app.
+It exits non-zero on any failure.
 
-Current run: **270 checks**, covering
+- `-- --shots qa-screens` writes a PNG of every page at two window sizes, which is how layout gets reviewed without a person sitting in front of the running app
+- `-- --images images` captures the application as a person sees it — the sign-in screen and the whole shell for every menu entry — which is what regenerates the screenshots above
+
+Current run: **289 checks**, covering
 
 - data integrity — stock reconciles with its movements, invoices reconcile with their lines, tax reconciles with its lines, no exempt product is ever taxed, no drawer goes negative
 - every screen loads and paints at desktop and laptop size, with assertions that grids are actually sized and nothing overflows the window

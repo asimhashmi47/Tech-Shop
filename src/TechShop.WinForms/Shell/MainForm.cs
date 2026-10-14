@@ -234,6 +234,33 @@ public sealed class MainForm : Form
         Close();
     }
 
+    // ---------------------------------------------------------------- test seams
+
+    /// <summary>
+    /// True once the signed-in profile has loaded and the rail has been built. The
+    /// shell fills itself from an async Load handler, so a screenshot taken before
+    /// this is of an empty window.
+    /// </summary>
+    internal bool ReadyForTest => _profile is not null;
+
+    internal PageBase? CurrentPageForTest => _current;
+
+    internal IReadOnlyList<NavEntry> NavigableForTest => Readable().ToList();
+
+    internal void NavigateForTest(Module module) => Navigate(module);
+
+    /// <summary>Picks a shop the way the top bar's picker does.</summary>
+    internal async Task UseShopForTest(long? shopId)
+    {
+        _session.ActiveShopId = shopId;
+        _topBar.SelectShop(shopId);
+
+        if (_current is not null)
+        {
+            await _current.ShopChangedAsync().ConfigureAwait(true);
+        }
+    }
+
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         foreach (var page in _pages.Values)

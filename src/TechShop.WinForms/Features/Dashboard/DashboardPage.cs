@@ -170,26 +170,24 @@ public sealed class DashboardPage : PageBase
 
         _recent
             .WithColumns(
-                new GridColumn<Application.Features.Sales.InvoiceListDto>("invoiceNo", "Invoice", r => r.InvoiceNo) { Width = 160 },
-                new GridColumn<Application.Features.Sales.InvoiceListDto>("invoiceDate", "Date", r => r.InvoiceDate)
-                {
-                    Width = 110,
-                    Format = r => Format.Date(r.InvoiceDate),
-                },
+                new GridColumn<Application.Features.Sales.InvoiceListDto>("invoiceNo", "Invoice", r => r.InvoiceNo) { Width = 150 },
+
+                // No date column: every row here is from the last few days, and the
+                // space it took left the customer name truncated to two letters.
                 new GridColumn<Application.Features.Sales.InvoiceListDto>("customerName", "Customer", r => r.CustomerName) { Fill = true },
                 new GridColumn<Application.Features.Sales.InvoiceListDto>("total", Format.MoneyHeader("Total"), r => r.Total)
                 {
                     // A shop's invoices reach seven figures, and a truncated total is
                     // worse than no total: "521,60..." reads as five hundred thousand
                     // or five million depending on the reader.
-                    Width = 140,
+                    Width = 130,
                     Align = ContentAlignment.MiddleRight,
                     Numeric = true,
                     Format = r => Format.Amount(r.Total),
                 },
                 new GridColumn<Application.Features.Sales.InvoiceListDto>("status", "Status", r => r.Status)
                 {
-                    Width = 90,
+                    Width = 80,
                     Chip = r =>
                     {
                         var (fill, ink) = Badge.ToneFor(r.Status);
@@ -214,11 +212,12 @@ public sealed class DashboardPage : PageBase
 
         _lowStock
             .WithColumns(
-                new GridColumn<Application.Features.Stock.StockLevelDto>("sku", "SKU", r => r.Sku) { Width = 120 },
+                // No SKU column: the name identifies the product, and the code was
+                // costing the name the room it needed to be readable.
                 new GridColumn<Application.Features.Stock.StockLevelDto>("productName", "Product", r => r.ProductName) { Fill = true },
                 new GridColumn<Application.Features.Stock.StockLevelDto>("qty", "On hand", r => r.Qty)
                 {
-                    Width = 80,
+                    Width = 72,
                     Align = ContentAlignment.MiddleRight,
                     Numeric = true,
                     Format = r => Format.Qty(r.Qty),
@@ -228,7 +227,7 @@ public sealed class DashboardPage : PageBase
                 },
                 new GridColumn<Application.Features.Stock.StockLevelDto>("reorderLevel", "Reorder at", r => r.ReorderLevel)
                 {
-                    Width = 86,
+                    Width = 78,
                     Align = ContentAlignment.MiddleRight,
                     Numeric = true,
                     Format = r => Format.Qty(r.ReorderLevel),

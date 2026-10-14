@@ -105,6 +105,26 @@ public sealed class TopBar : Panel
         _suppressShopEvent = false;
     }
 
+    /// <summary>
+    /// Moves the picker without raising ShopChanged, for callers that have already
+    /// applied the change themselves.
+    /// </summary>
+    internal void SelectShop(long? shopId)
+    {
+        _suppressShopEvent = true;
+
+        foreach (var choice in _shopPicker.Items.OfType<ShopChoice>())
+        {
+            if (choice.Id == shopId)
+            {
+                _shopPicker.SelectedItem = choice;
+                break;
+            }
+        }
+
+        _suppressShopEvent = false;
+    }
+
     protected override void OnResize(EventArgs eventargs)
     {
         base.OnResize(eventargs);

@@ -31,6 +31,11 @@ internal static class Program
             ScreenTests.ShotDirectory = args[shots + 1];
         }
 
+        // --images <dir> captures the application the way a person sees it: the sign-in
+        // screen and the whole shell for every menu entry, for the README.
+        var images = Array.IndexOf(args, "--images");
+        var imageDirectory = images >= 0 && images + 1 < args.Length ? args[images + 1] : null;
+
         System.Windows.Forms.Application.EnableVisualStyles();
         System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
         Theme.Apply();
@@ -57,6 +62,11 @@ internal static class Program
             TillTests.RunAsync(harness).GetAwaiter().GetResult();
             PrintTests.RunAsync(harness, ScreenTests.ShotDirectory).GetAwaiter().GetResult();
             DialogTests.RunAsync(harness).GetAwaiter().GetResult();
+
+            if (imageDirectory is not null)
+            {
+                AppShots.Run(harness, imageDirectory);
+            }
             PermissionTests.RunAsync(harness, provider).GetAwaiter().GetResult();
             LoadTests.RunAsync(harness).GetAwaiter().GetResult();
         }
