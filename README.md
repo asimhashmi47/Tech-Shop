@@ -67,7 +67,9 @@ An invoice prints in two formats, chosen in the preview before anything reaches 
 
 The till defaults to the receipt and the Invoices screen defaults to A4, since that is the paper each one usually has loaded. One renderer draws both the preview and the paper, so what is checked on screen is what comes out.
 
-![Invoice on A4](images/17-invoice-a4.png)
+| A4 page | 80mm receipt |
+|---|---|
+| ![Invoice on A4](images/17-invoice-a4.png) | ![Invoice on an 80mm roll](images/18-invoice-receipt-80mm.png) |
 
 ## Screens
 
@@ -82,18 +84,41 @@ The till defaults to the receipt and the Invoices screen defaults to A4, since t
 | Reports | Period summary, profit and loss, balance sheet, cash flow |
 | Shops, Users, Settings, Audit log | Admin, including the per-module permission matrix |
 
-Every screen is in [`images/`](images/), captured from the running application:
+All of these are captured from the running application, not mocked up.
 
-| | | |
-|---|---|---|
-| [Sign in](images/01-login.png) | [Dashboard](images/02-dashboard.png) | [Point of sale](images/03-point-of-sale.png) |
-| [Invoices](images/04-invoices.png) | [Customers](images/05-customers.png) | [Products](images/06-products.png) |
-| [Stock](images/07-stock.png) | [Suppliers](images/08-suppliers.png) | [Purchases](images/09-purchases.png) |
-| [Expenses](images/10-expenses.png) | [Petty cash](images/11-petty-cash.png) | [Reports](images/12-reports.png) |
-| [Shops](images/13-shops.png) | [Users](images/14-users.png) | [Audit log](images/15-audit-log.png) |
-| [Settings](images/16-settings.png) | [Invoice, A4](images/17-invoice-a4.png) | [Invoice, 80mm](images/18-invoice-receipt-80mm.png) |
+**Sign in**
+
+![Sign in](images/01-login.png)
+
+**Point of sale** — the shelf on the left, the cart with per-line tax on the right
 
 ![Point of sale](images/03-point-of-sale.png)
+
+**Invoices**
+
+![Invoices](images/04-invoices.png)
+
+**Customers** — what each account still owes
+
+![Customers](images/05-customers.png)
+
+**Products** — the catalogue, with each line's tax status
+
+![Products](images/06-products.png)
+
+**Stock** — on hand per shop, flagged against the reorder level
+
+![Stock](images/07-stock.png)
+
+**Reports** — period summary, profit and loss, balance sheet and cash flow over one date range
+
+![Reports](images/12-reports.png)
+
+**Shops**
+
+![Shops](images/13-shops.png)
+
+The rest are in [`images/`](images/): [Suppliers](images/08-suppliers.png), [Purchases](images/09-purchases.png), [Expenses](images/10-expenses.png), [Petty cash](images/11-petty-cash.png), [Users](images/14-users.png), [Audit log](images/15-audit-log.png) and [Settings](images/16-settings.png).
 
 ## Tech stack
 
