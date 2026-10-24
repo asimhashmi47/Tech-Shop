@@ -506,17 +506,48 @@ public sealed class SalesService(
             throw ValidationFailedException.ForField(nameof(request.Amount), "Enter an amount above zero.");
         }
 
-        var owed = await db.SalesInvoices
-            .Where(i => i.CustomerId == request.CustomerId && i.ShopId == request.ShopId
-                && !i.IsDeleted && i.Status != InvoiceStatus.Void)
-            .SumAsync(i => i.Total - i.PaidAmount, ct)
-            .ConfigureAwait(false);
+        // A receipt against a named invoice is limited by that invoice, not by the
+        // customer's whole account. Checking the account total let a payment meant for
+        // one invoice be larger than that invoice, because the customer's other unpaid
+        // documents covered the difference -- and the invoice was then overpaid, its
+        // outstanding figure going negative.
+        SalesInvoice? target = null;
+
+        if (request.SalesInvoiceId is { } invoiceId)
+        {
+            target = await db.SalesInvoices
+                .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
+                .ConfigureAwait(false)
+                ?? throw new NotFoundException(nameof(SalesInvoice), invoiceId);
+
+            if (target.Status == InvoiceStatus.Void)
+            {
+                throw new ConflictException("A void invoice cannot take a payment.");
+            }
+
+            if (target.CustomerId != request.CustomerId || target.ShopId != request.ShopId)
+            {
+                throw ValidationFailedException.ForField(
+                    nameof(request.SalesInvoiceId),
+                    "That invoice belongs to a different customer or shop.");
+            }
+        }
+
+        var owed = target is not null
+            ? target.Total - target.PaidAmount
+            : await db.SalesInvoices
+                .Where(i => i.CustomerId == request.CustomerId && i.ShopId == request.ShopId
+                    && !i.IsDeleted && i.Status != InvoiceStatus.Void)
+                .SumAsync(i => i.Total - i.PaidAmount, ct)
+                .ConfigureAwait(false);
 
         if (request.Amount > owed)
         {
             throw ValidationFailedException.ForField(
                 nameof(request.Amount),
-                $"That customer owes {owed:0.00}, so the receipt is too large.");
+                target is not null
+                    ? $"That invoice has {owed:0.00} outstanding, so the receipt is too large."
+                    : $"That customer owes {owed:0.00}, so the receipt is too large.");
         }
 
         await using var tx = await db.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -536,18 +567,10 @@ public sealed class SalesService(
 
         db.CustomerPayments.Add(payment);
 
-        if (request.SalesInvoiceId is { } invoiceId)
+        if (target is not null)
         {
-            var invoice = await db.SalesInvoices.FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, ct)
-                .ConfigureAwait(false) ?? throw new NotFoundException(nameof(SalesInvoice), invoiceId);
-
-            if (invoice.Status == InvoiceStatus.Void)
-            {
-                throw new ConflictException("A void invoice cannot take a payment.");
-            }
-
-            invoice.PaidAmount += request.Amount;
-            invoice.Status = StatusFor(invoice.Total, invoice.PaidAmount);
+            target.PaidAmount += request.Amount;
+            target.Status = StatusFor(target.Total, target.PaidAmount);
         }
         else
         {

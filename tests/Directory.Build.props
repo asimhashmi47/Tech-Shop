@@ -1,0 +1,26 @@
+<Project>
+
+  <!--
+    The root props file guards warnings-as-errors on $(IsTestProject), but that property
+    is set inside each csproj, which MSBuild evaluates after the props file — so the
+    guard never saw it. Declaring it here, where it is read before the root import,
+    makes the guard work and keeps the rule in one place.
+  -->
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <!--
+      Test names read as sentences here (Outstanding_is_total_less_what_has_been_paid),
+      which is deliberate: the test list doubles as the specification. The remaining
+      rules are about public API shape, which does not apply to a test assembly.
+    -->
+    <NoWarn>$(NoWarn);CA1707;CA1034;CA1515;CA1812;CA1861;CA2007;CA5394;xUnit1042</NoWarn>
+  </PropertyGroup>
+
+</Project>

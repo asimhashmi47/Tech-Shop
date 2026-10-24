@@ -6,6 +6,8 @@
     <Project Path="src/TechShop.WinForms/TechShop.WinForms.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/TechShop.IntegrationTests/TechShop.IntegrationTests.csproj" />
     <Project Path="tests/TechShop.QaHarness/TechShop.QaHarness.csproj" />
+    <Project Path="tests/TechShop.UnitTests/TechShop.UnitTests.csproj" />
   </Folder>
 </Solution>
