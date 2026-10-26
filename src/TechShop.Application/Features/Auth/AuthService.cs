@@ -24,6 +24,12 @@ public sealed class AuthService(
     ICurrentUser currentUser,
     IDateTimeProvider clock)
 {
+    /// <summary>Consecutive failures before the account stops answering at all.</summary>
+    public const int MaxFailedAttempts = 5;
+
+    /// <summary>How long a locked account stays shut.</summary>
+    public static readonly TimeSpan LockoutWindow = TimeSpan.FromMinutes(15);
+
     public async Task<UserProfile> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         var username = (request.Username ?? string.Empty).Trim();
@@ -34,8 +40,37 @@ public sealed class AuthService(
             .FirstOrDefaultAsync(u => u.Username == username && !u.IsDeleted, ct)
             .ConfigureAwait(false);
 
+        // A locked account is refused before the password is even considered, so
+        // guessing cannot continue past the limit however fast it arrives.
+        if (user?.LockedOutUntil is { } until && until > clock.UtcNow)
+        {
+            await audit.LogAsync(
+                Module.Users,
+                AuditAction.LoginFailed,
+                nameof(AppUser),
+                user.Id,
+                $"Sign-in refused, '{username}' is locked until {until:u}",
+                usernameOverride: username,
+                ct: ct).ConfigureAwait(false);
+
+            throw new ForbiddenException(
+                $"That account is locked after {MaxFailedAttempts} failed attempts. Try again later.");
+        }
+
         if (user is null || !user.IsActive || !hasher.Verify(request.Password ?? string.Empty, user.PasswordHash))
         {
+            if (user is not null)
+            {
+                user.FailedLoginCount++;
+
+                if (user.FailedLoginCount >= MaxFailedAttempts)
+                {
+                    user.LockedOutUntil = clock.UtcNow.Add(LockoutWindow);
+                }
+
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+
             await audit.LogAsync(
                 Module.Users,
                 AuditAction.LoginFailed,
@@ -50,6 +85,10 @@ public sealed class AuthService(
             throw new ForbiddenException("Invalid username or password.");
         }
 
+        // Getting in clears the slate: someone who mistypes twice most mornings must
+        // never accumulate their way into a lockout.
+        user.FailedLoginCount = 0;
+        user.LockedOutUntil = null;
         user.LastLoginAt = clock.UtcNow;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 

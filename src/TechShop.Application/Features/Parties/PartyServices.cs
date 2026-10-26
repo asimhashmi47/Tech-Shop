@@ -38,6 +38,7 @@ public sealed class SupplierService(
     ICurrentUser currentUser,
     IShopScope shopScope,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<SupplierDto> Spec { get; } = new QuerySpec<SupplierDto>()
@@ -87,6 +88,8 @@ public sealed class SupplierService(
 
     public async Task<SupplierDto> CreateAsync(SaveSupplierRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Suppliers, Access.Write, ct).ConfigureAwait(false);
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             throw ValidationFailedException.ForField(nameof(request.Name), "Supplier name is required.");
@@ -112,6 +115,8 @@ public sealed class SupplierService(
 
     public async Task<SupplierDto> UpdateAsync(long id, SaveSupplierRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Suppliers, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Supplier), id);
 
@@ -183,6 +188,7 @@ public sealed class CustomerService(
     ICurrentUser currentUser,
     IShopScope shopScope,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<CustomerDto> Spec { get; } = new QuerySpec<CustomerDto>()
@@ -235,6 +241,8 @@ public sealed class CustomerService(
 
     public async Task<CustomerDto> CreateAsync(SaveCustomerRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Customers, Access.Write, ct).ConfigureAwait(false);
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             throw ValidationFailedException.ForField(nameof(request.Name), "Customer name is required.");
@@ -260,6 +268,8 @@ public sealed class CustomerService(
 
     public async Task<CustomerDto> UpdateAsync(long id, SaveCustomerRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Customers, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.Customers.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Customer), id);
 

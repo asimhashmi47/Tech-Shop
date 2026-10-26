@@ -23,6 +23,15 @@ public class AppUser : AuditableEntity
     public bool IsActive { get; set; } = true;
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>
+    /// Consecutive failed sign-ins. Reset the moment the right password arrives, so a
+    /// cashier who mistypes twice a day never accumulates their way to a lockout.
+    /// </summary>
+    public int FailedLoginCount { get; set; }
+
+    /// <summary>Set when the count passes the limit; sign-in is refused until it passes.</summary>
+    public DateTime? LockedOutUntil { get; set; }
+
     public ICollection<UserShop> UserShops { get; set; } = [];
     public ICollection<UserPermission> Permissions { get; set; } = [];
 }
@@ -70,4 +79,13 @@ public class AuditLog
     public string? Summary { get; set; }
     public string? Machine { get; set; }
     public string? CorrelationId { get; set; }
+
+    /// <summary>
+    /// Hash of this row's contents chained to the one before it. The database is a file
+    /// on a shop PC, so anyone can open it; chaining means an edited or deleted row
+    /// breaks the chain and the tampering can at least be detected.
+    /// </summary>
+    public string? Hash { get; set; }
+
+    public string? PreviousHash { get; set; }
 }

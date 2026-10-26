@@ -23,6 +23,7 @@ public sealed class CategoryService(
     ICurrentUser currentUser,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<CategoryDto> Spec { get; } = new QuerySpec<CategoryDto>()
@@ -49,6 +50,8 @@ public sealed class CategoryService(
 
     public async Task<CategoryDto> CreateAsync(SaveCategoryRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Products, Access.Write, ct).ConfigureAwait(false);
+
         var name = request.Name.Trim();
         if (await db.Categories.AnyAsync(c => c.Name == name && !c.IsDeleted, ct).ConfigureAwait(false))
         {
@@ -80,6 +83,8 @@ public sealed class CategoryService(
 
     public async Task<CategoryDto> UpdateAsync(long id, SaveCategoryRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Products, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.Categories.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Category), id);
 
@@ -111,6 +116,8 @@ public sealed class CategoryService(
 
     public async Task DeleteAsync(long id, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Products, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.Categories.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Category), id);
 

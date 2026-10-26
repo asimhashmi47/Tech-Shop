@@ -72,6 +72,8 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(a => a.Summary).HasMaxLength(1000);
         builder.Property(a => a.Machine).HasMaxLength(60);
         builder.Property(a => a.CorrelationId).HasMaxLength(60);
+        builder.Property(a => a.Hash).HasMaxLength(64);
+        builder.Property(a => a.PreviousHash).HasMaxLength(64);
         builder.HasIndex(a => a.At);
         builder.HasIndex(a => new { a.Module, a.Action });
         builder.HasIndex(a => a.UserId);
@@ -123,6 +125,7 @@ public sealed class StockLevelConfiguration : IEntityTypeConfiguration<StockLeve
     public void Configure(EntityTypeBuilder<StockLevel> builder)
     {
         builder.HasIndex(s => new { s.ShopId, s.ProductId }).IsUnique();
+        builder.ToTable(t => t.HasCheckConstraint("CK_StockLevels_Qty_NotNegative", "Qty >= 0"));
         builder.HasOne(s => s.Shop).WithMany().HasForeignKey(s => s.ShopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(s => s.Product).WithMany().HasForeignKey(s => s.ProductId).OnDelete(DeleteBehavior.Restrict);
     }

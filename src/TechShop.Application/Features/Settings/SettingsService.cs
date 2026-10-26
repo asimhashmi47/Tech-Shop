@@ -27,6 +27,7 @@ public sealed class SettingsService(
     IAuditService audit,
     ICurrentUser currentUser,
     ICacheService cache,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public const string CurrencyKey = "Currency";
@@ -82,6 +83,8 @@ public sealed class SettingsService(
 
     public async Task<AppSettingsDto> UpdateAsync(SaveSettingsRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Settings, Access.Write, ct).ConfigureAwait(false);
+
         if (!currentUser.IsAdmin)
         {
             throw new ForbiddenException("Only the owner account can change application settings.");

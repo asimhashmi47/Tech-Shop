@@ -44,6 +44,7 @@ public sealed class PettyCashService(
     IShopScope shopScope,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<PettyCashEntryDto> Spec { get; } = new QuerySpec<PettyCashEntryDto>()
@@ -117,6 +118,8 @@ public sealed class PettyCashService(
 
     public async Task<PettyCashEntryDto> CreateAsync(SavePettyCashRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.PettyCash, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Amount <= 0)
@@ -168,6 +171,8 @@ public sealed class PettyCashService(
 
     public async Task DeleteAsync(long id, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.PettyCash, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.PettyCashEntries.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             .ConfigureAwait(false) ?? throw new NotFoundException(nameof(PettyCashEntry), id);
 

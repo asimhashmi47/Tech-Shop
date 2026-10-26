@@ -59,6 +59,7 @@ public sealed class ProductService(
     IShopScope shopScope,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<ProductDto> Spec { get; } = new QuerySpec<ProductDto>()
@@ -145,6 +146,8 @@ public sealed class ProductService(
 
     public async Task<ProductDto> CreateAsync(SaveProductRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Products, Access.Write, ct).ConfigureAwait(false);
+
         Validate(request);
         var sku = request.Sku.Trim().ToUpperInvariant();
 
@@ -188,6 +191,8 @@ public sealed class ProductService(
 
     public async Task<ProductDto> UpdateAsync(long id, SaveProductRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Products, Access.Write, ct).ConfigureAwait(false);
+
         Validate(request);
 
         var entity = await db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct).ConfigureAwait(false)
@@ -234,6 +239,8 @@ public sealed class ProductService(
 
     public async Task DeleteAsync(long id, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Products, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Product), id);
 

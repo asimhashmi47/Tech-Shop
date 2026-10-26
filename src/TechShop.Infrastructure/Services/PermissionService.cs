@@ -12,7 +12,12 @@ namespace TechShop.Infrastructure.Services;
 /// </summary>
 public sealed class PermissionService(AppDbContext db, ICacheService cache) : IPermissionService
 {
-    private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(15);
+    /// <summary>
+    /// Short on purpose. Every path that changes a user invalidates this, but the TTL
+    /// is the backstop for one that forgets, and fifteen minutes of stale authority
+    /// after an account is cut off is too long to be a backstop.
+    /// </summary>
+    private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(30);
 
     public async Task<bool> HasAccessAsync(long userId, Module module, Access access, CancellationToken ct = default)
     {
@@ -33,12 +38,20 @@ public sealed class PermissionService(AppDbContext db, ICacheService cache) : IP
             CacheKeys.Permission(userId),
             async () =>
             {
+                // IsActive is part of the question, not a separate check somewhere
+                // else: a deactivated account that is still signed in was keeping
+                // every permission it had until it closed the app.
                 var role = await db.Users
                     .AsNoTracking()
-                    .Where(u => u.Id == userId)
+                    .Where(u => u.Id == userId && u.IsActive && !u.IsDeleted)
                     .Select(u => (UserRole?)u.Role)
                     .FirstOrDefaultAsync(ct)
                     .ConfigureAwait(false);
+
+                if (role is null)
+                {
+                    return new Dictionary<Module, (bool, bool)>();
+                }
 
                 if (role == UserRole.Admin)
                 {
@@ -47,7 +60,7 @@ public sealed class PermissionService(AppDbContext db, ICacheService cache) : IP
 
                 var rows = await db.UserPermissions
                     .AsNoTracking()
-                    .Where(p => p.UserId == userId)
+                    .Where(p => p.UserId == userId && p.User.IsActive && !p.User.IsDeleted)
                     .Select(p => new { p.Module, p.CanRead, p.CanWrite })
                     .ToListAsync(ct)
                     .ConfigureAwait(false);
@@ -64,10 +77,21 @@ public sealed class PermissionService(AppDbContext db, ICacheService cache) : IP
             CacheKeys.AllowedShops(userId),
             async () =>
             {
-                var isAdmin = await db.Users
+                var active = await db.Users
                     .AsNoTracking()
-                    .AnyAsync(u => u.Id == userId && u.Role == UserRole.Admin, ct)
+                    .Where(u => u.Id == userId && u.IsActive && !u.IsDeleted)
+                    .Select(u => (UserRole?)u.Role)
+                    .FirstOrDefaultAsync(ct)
                     .ConfigureAwait(false);
+
+                // No account, no shops. A deactivated user could previously still
+                // resolve every shop they had been assigned.
+                if (active is null)
+                {
+                    return [];
+                }
+
+                var isAdmin = active == UserRole.Admin;
 
                 if (isAdmin)
                 {
@@ -81,7 +105,7 @@ public sealed class PermissionService(AppDbContext db, ICacheService cache) : IP
 
                 return await db.UserShops
                     .AsNoTracking()
-                    .Where(us => us.UserId == userId && !us.Shop.IsDeleted)
+                    .Where(us => us.UserId == userId && !us.Shop.IsDeleted && us.User.IsActive)
                     .Select(us => us.ShopId)
                     .ToListAsync(ct)
                     .ConfigureAwait(false);

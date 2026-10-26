@@ -47,6 +47,7 @@ public sealed class UserService(
     ICurrentUser currentUser,
     IPermissionService permissions,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<UserListDto> Spec { get; } = new QuerySpec<UserListDto>()
@@ -91,6 +92,8 @@ public sealed class UserService(
 
     public async Task<UserDetailDto> CreateAsync(SaveUserRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Users, Access.Write, ct).ConfigureAwait(false);
+
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
         {
             throw ValidationFailedException.ForField(nameof(request.Password), "Use at least 8 characters.");
@@ -126,6 +129,8 @@ public sealed class UserService(
 
     public async Task<UserDetailDto> UpdateAsync(long id, SaveUserRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Users, Access.Write, ct).ConfigureAwait(false);
+
         var user = await db.Users
             .Include(u => u.UserShops)
             .Include(u => u.Permissions)
@@ -170,6 +175,8 @@ public sealed class UserService(
 
     public async Task DeactivateAsync(long id, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Users, Access.Write, ct).ConfigureAwait(false);
+
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(AppUser), id);
 

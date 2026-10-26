@@ -116,6 +116,7 @@ public sealed class SalesService(
     IShopScope shopScope,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<InvoiceListDto> Spec { get; } = new QuerySpec<InvoiceListDto>()
@@ -224,6 +225,8 @@ public sealed class SalesService(
 
     public async Task<InvoiceDetailDto> CreateSaleAsync(CreateSaleRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Pos, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Items.Count == 0)
@@ -410,6 +413,8 @@ public sealed class SalesService(
     /// <summary>Admin only. Reverses the stock movements and the money recorded against the invoice.</summary>
     public async Task<InvoiceDetailDto> VoidAsync(long id, VoidInvoiceRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Invoices, Access.Write, ct).ConfigureAwait(false);
+
         if (!currentUser.IsAdmin)
         {
             throw new ForbiddenException("Only an admin can void an invoice.");
@@ -499,6 +504,8 @@ public sealed class SalesService(
 
     public async Task<CustomerPaymentDto> ReceiveAsync(CreateCustomerPaymentRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Invoices, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Amount <= 0)

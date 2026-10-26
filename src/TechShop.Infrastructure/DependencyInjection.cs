@@ -23,8 +23,13 @@ public static class DependencyInjection
             Directory.CreateDirectory(directory);
         }
 
+        // The file is encrypted, so the key has to be in hand before anything opens it,
+        // and a database from a build that predates this has to be converted first.
+        var key = DatabaseKey.ForDatabase(databasePath);
+        DatabaseKey.EncryptIfPlaintext(databasePath, key);
+
         services.AddDbContext<AppDbContext>(options => options
-            .UseSqlite($"Data Source={databasePath}")
+            .UseSqlite(DatabaseKey.ConnectionString(databasePath, key))
             .EnableSensitiveDataLogging(false));
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
@@ -41,6 +46,7 @@ public static class DependencyInjection
 
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IShopScope, ShopScope>();
+        services.AddScoped<IAccessGuard, AccessGuard>();
         services.AddScoped<IAuditService, AuditService>();
 
         services.AddApplicationServices();

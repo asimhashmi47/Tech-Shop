@@ -94,6 +94,7 @@ public sealed class PurchaseService(
     IShopScope shopScope,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<PurchaseBillListDto> Spec { get; } = new QuerySpec<PurchaseBillListDto>()
@@ -192,6 +193,8 @@ public sealed class PurchaseService(
 
     public async Task<PurchaseBillDetailDto> CreateAsync(CreatePurchaseRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Purchases, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Items.Count == 0)
@@ -323,6 +326,8 @@ public sealed class PurchaseService(
 
     public async Task<SupplierPaymentDto> PayAsync(CreateSupplierPaymentRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Purchases, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Amount <= 0)

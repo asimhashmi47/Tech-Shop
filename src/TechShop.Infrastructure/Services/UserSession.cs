@@ -24,6 +24,23 @@ public sealed class UserSession : ICurrentUser
 
     public bool IsAuthenticated => UserId is not null;
 
+    /// <summary>
+    /// How long the session may sit untouched. Fifteen minutes is long enough to deal
+    /// with a delivery or a phone call and short enough that a till left over a lunch
+    /// break is not still signed in when someone else wanders past.
+    /// </summary>
+    public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromMinutes(15);
+
+    public DateTime LastActivityUtc { get; private set; } = DateTime.UtcNow;
+
+    public bool IsIdle => IsAuthenticated && DateTime.UtcNow - LastActivityUtc >= IdleTimeout;
+
+    /// <summary>
+    /// Called from the shell's message filter on every keypress and click. Real work at
+    /// the till is what keeps the session alive; a timer firing on its own is not.
+    /// </summary>
+    public void Touch() => LastActivityUtc = DateTime.UtcNow;
+
     public string Machine { get; } = SafeMachineName();
 
     /// <summary>
@@ -49,6 +66,7 @@ public sealed class UserSession : ICurrentUser
         AllowedShopIds = allowedShopIds;
         ActiveShopId = allowedShopIds.Count == 1 ? allowedShopIds[0] : null;
         CorrelationId = Guid.NewGuid().ToString("n")[..12];
+        LastActivityUtc = DateTime.UtcNow;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 

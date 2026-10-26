@@ -55,6 +55,7 @@ public sealed class StockService(
     IShopScope shopScope,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<StockLevelDto> LevelSpec { get; } = new QuerySpec<StockLevelDto>()
@@ -122,6 +123,8 @@ public sealed class StockService(
 
     public async Task SetOpeningAsync(OpeningStockRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Stock, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Qty < 0)
@@ -163,6 +166,8 @@ public sealed class StockService(
 
     public async Task AdjustAsync(AdjustStockRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Stock, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
 
         if (request.Qty == 0)
@@ -210,6 +215,8 @@ public sealed class StockService(
 
     public async Task TransferAsync(TransferStockRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Stock, Access.Write, ct).ConfigureAwait(false);
+
         if (request.FromShopId == request.ToShopId)
         {
             throw ValidationFailedException.ForField(nameof(request.ToShopId), "Pick a different destination shop.");
@@ -269,17 +276,27 @@ public sealed class StockService(
         string? reason,
         CancellationToken ct = default)
     {
-        var level = await db.StockLevels
-            .FirstOrDefaultAsync(s => s.ShopId == shopId && s.ProductId == productId, ct)
-            .ConfigureAwait(false);
-
-        if (level is null)
+        // Every change to the shelf goes through the atomic pair below rather than a
+        // read-modify-write on a tracked entity. The old way checked the quantity in
+        // one statement and wrote it in another, so concurrent tills each read the
+        // same last unit and each sold it, taking stock negative.
+        if (signedQty < 0)
         {
-            level = new StockLevel { ShopId = shopId, ProductId = productId, Qty = 0 };
-            db.StockLevels.Add(level);
-        }
+            var taken = await db.TryTakeStockAsync(shopId, productId, -signedQty, ct).ConfigureAwait(false);
 
-        level.Qty += signedQty;
+            if (!taken)
+            {
+                var onHand = await CurrentQtyAsync(shopId, productId, ct).ConfigureAwait(false);
+
+                throw ValidationFailedException.ForField(
+                    "Qty",
+                    $"Only {onHand} left in stock, so {-signedQty} cannot be taken.");
+            }
+        }
+        else
+        {
+            await db.AddStockAsync(shopId, productId, signedQty, ct).ConfigureAwait(false);
+        }
 
         db.StockMovements.Add(new StockMovement
         {

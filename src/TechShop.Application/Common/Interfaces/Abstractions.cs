@@ -16,6 +16,13 @@ public interface ICurrentUser
     bool IsAdmin { get; }
     bool IsAuthenticated { get; }
 
+    /// <summary>
+    /// True when the session has sat untouched past its timeout. A till stands on a
+    /// shop floor where anyone can reach the keyboard, so an unattended session is a
+    /// signed-in session for whoever walks up next.
+    /// </summary>
+    bool IsIdle { get; }
+
     /// <summary>Workstation name, written to the audit log in place of the web app's IP.</summary>
     string? Machine { get; }
     string? CorrelationId { get; }
@@ -38,8 +45,18 @@ public interface IPermissionService
     void Invalidate(long userId);
 }
 
+/// <summary>The outcome of checking the audit chain.</summary>
+public sealed record AuditIntegrityResult(bool Intact, int Checked, string? Detail);
+
 public interface IAuditService
 {
+    /// <summary>
+    /// Walks the audit chain and reports whether it still adds up. The database is a
+    /// file on a shop PC, so rows can be edited or removed outside the app; this cannot
+    /// prevent that, but it makes it visible.
+    /// </summary>
+    Task<AuditIntegrityResult> VerifyAsync(CancellationToken ct = default);
+
     Task LogAsync(
         Module module,
         AuditAction action,
@@ -85,4 +102,18 @@ public interface IPasswordHasher
 public interface IExcelExportService
 {
     byte[] Build<T>(string sheetName, IReadOnlyList<T> rows, Query.QuerySpec<T> spec, IEnumerable<string> columns);
+}
+
+/// <summary>
+/// Refuses work the signed-in account has no permission for.
+///
+/// The permission rows existed from the start, but only the sidebar ever read them: it
+/// hid what you could not use. Hiding a button is not a defence — the service behind it
+/// was happy to be called. Every write path now asks here first, so authority is decided
+/// in one place and a hidden button is cosmetic rather than load-bearing.
+/// </summary>
+public interface IAccessGuard
+{
+    /// <summary>Throws <c>ForbiddenException</c> unless the caller holds this access.</summary>
+    Task EnsureAsync(Module module, Access access, CancellationToken ct = default);
 }

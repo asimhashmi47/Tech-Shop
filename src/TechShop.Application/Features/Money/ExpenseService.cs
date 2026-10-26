@@ -40,6 +40,7 @@ public sealed class ExpenseService(
     IShopScope shopScope,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<ExpenseDto> Spec { get; } = new QuerySpec<ExpenseDto>()
@@ -78,6 +79,8 @@ public sealed class ExpenseService(
 
     public async Task<ExpenseCategoryDto> CreateCategoryAsync(SaveExpenseCategoryRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Expenses, Access.Write, ct).ConfigureAwait(false);
+
         var name = request.Name.Trim();
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -115,6 +118,8 @@ public sealed class ExpenseService(
 
     public async Task<ExpenseDto> CreateAsync(SaveExpenseRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Expenses, Access.Write, ct).ConfigureAwait(false);
+
         await shopScope.EnsureWritableAsync(request.ShopId, ct).ConfigureAwait(false);
         Validate(request);
 
@@ -171,6 +176,8 @@ public sealed class ExpenseService(
 
     public async Task<ExpenseDto> UpdateAsync(long id, SaveExpenseRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Expenses, Access.Write, ct).ConfigureAwait(false);
+
         Validate(request);
 
         var entity = await db.Expenses.FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, ct).ConfigureAwait(false)
@@ -239,6 +246,8 @@ public sealed class ExpenseService(
 
     public async Task DeleteAsync(long id, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Expenses, Access.Write, ct).ConfigureAwait(false);
+
         var entity = await db.Expenses.FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Expense), id);
 

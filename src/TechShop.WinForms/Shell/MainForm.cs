@@ -15,13 +15,19 @@ namespace TechShop.WinForms.Shell;
 /// re-query everything. They are disposed with the shell, which is also when their DI
 /// scopes and change trackers go.
 /// </summary>
-public sealed class MainForm : Form
+public sealed class MainForm : Form, IMessageFilter
 {
     private readonly SideNav _nav = new();
     private readonly TopBar _topBar = new();
     private readonly Panel _content;
     private readonly Dictionary<Module, PageBase> _pages = [];
     private readonly UserSession _session;
+
+    /// <summary>
+    /// Watches for the session ageing out. It ticks far more often than the timeout so
+    /// the lock arrives promptly rather than up to a timeout late.
+    /// </summary>
+    private readonly System.Windows.Forms.Timer _idleCheck = new() { Interval = 15_000 };
 
     private UserProfile? _profile;
     private PageBase? _current;
@@ -60,11 +66,70 @@ public sealed class MainForm : Form
         _topBar.ShopChanged += async (_, shopId) => await OnShopChangedAsync(shopId).ConfigureAwait(true);
         _topBar.SignOutRequested += async (_, _) => await SignOutAsync().ConfigureAwait(true);
 
+        _idleCheck.Tick += (_, _) => LockIfIdle();
+
         Load += async (_, _) => await StartAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Every keypress and mouse click in the process counts as the operator being
+    /// present. Filtering messages is the only way to see input aimed at any control,
+    /// rather than wiring an event onto each one.
+    /// </summary>
+    public bool PreFilterMessage(ref Message m)
+    {
+        const int WM_KEYDOWN = 0x0100;
+        const int WM_LBUTTONDOWN = 0x0201;
+        const int WM_RBUTTONDOWN = 0x0204;
+        const int WM_MOUSEWHEEL = 0x020A;
+
+        if (m.Msg is WM_KEYDOWN or WM_LBUTTONDOWN or WM_RBUTTONDOWN or WM_MOUSEWHEEL)
+        {
+            _session.Touch();
+        }
+
+        // Never swallow the message: this only observes.
+        return false;
+    }
+
+    /// <summary>
+    /// Closes the shell back to the login screen when the till has been left alone.
+    /// The services refuse an idle session anyway; this is what makes that visible
+    /// instead of surfacing as a baffling refusal twenty minutes later.
+    /// </summary>
+    private void LockIfIdle()
+    {
+        if (!_session.IsIdle)
+        {
+            return;
+        }
+
+        _idleCheck.Stop();
+        _session.SignOut();
+        SignOutRequested = true;
+        Close();
     }
 
     /// <summary>True when the shell closed because the operator signed out, not quit.</summary>
     public bool SignOutRequested { get; private set; }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        System.Windows.Forms.Application.AddMessageFilter(this);
+        _session.Touch();
+        _idleCheck.Start();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _idleCheck.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 
     private async Task StartAsync()
     {
@@ -263,6 +328,9 @@ public sealed class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _idleCheck.Stop();
+        System.Windows.Forms.Application.RemoveMessageFilter(this);
+
         foreach (var page in _pages.Values)
         {
             page.Dispose();

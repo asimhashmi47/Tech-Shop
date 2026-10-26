@@ -26,6 +26,7 @@ public sealed class ShopService(
     IPermissionService permissions,
     ICacheService cache,
     IExcelExportService excel,
+    IAccessGuard access,
     IDateTimeProvider clock)
 {
     public static QuerySpec<ShopDto> Spec { get; } = new QuerySpec<ShopDto>()
@@ -64,6 +65,8 @@ public sealed class ShopService(
 
     public async Task<ShopDto> CreateAsync(SaveShopRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Shops, Access.Write, ct).ConfigureAwait(false);
+
         await EnsureCodeFreeAsync(request.Code, null, ct).ConfigureAwait(false);
 
         var shop = new Shop
@@ -92,6 +95,8 @@ public sealed class ShopService(
 
     public async Task<ShopDto> UpdateAsync(long id, SaveShopRequest request, CancellationToken ct = default)
     {
+        await access.EnsureAsync(Module.Shops, Access.Write, ct).ConfigureAwait(false);
+
         var shop = await db.Shops.FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted, ct).ConfigureAwait(false)
             ?? throw new NotFoundException(nameof(Shop), id);
 

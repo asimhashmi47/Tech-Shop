@@ -33,6 +33,16 @@ public interface IAppDbContext
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Takes stock off the shelf in one statement, returning false when there is not
+    /// enough. The quantity is checked and written by the same UPDATE, so two tills
+    /// cannot both read the last unit and both sell it.
+    /// </summary>
+    Task<bool> TryTakeStockAsync(long shopId, long productId, int qty, CancellationToken ct = default);
+
+    /// <summary>Puts stock on the shelf, creating the row the first time a shop holds a product.</summary>
+    Task AddStockAsync(long shopId, long productId, int qty, CancellationToken ct = default);
+
     /// <summary>Used by POS and purchase flows so stock, invoice and ledger move together.</summary>
     Task<IAppTransaction> BeginTransactionAsync(CancellationToken ct = default);
 }

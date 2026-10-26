@@ -70,6 +70,9 @@ namespace TechShop.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -82,6 +85,9 @@ namespace TechShop.Infrastructure.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LockedOutUntil")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PasswordHash")
@@ -135,12 +141,20 @@ namespace TechShop.Infrastructure.Persistence.Migrations
                     b.Property<long?>("EntityId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Machine")
                         .HasMaxLength(60)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Module")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("PreviousHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("ShopId")
                         .HasColumnType("INTEGER");
@@ -813,7 +827,10 @@ namespace TechShop.Infrastructure.Persistence.Migrations
                     b.HasIndex("ShopId", "ProductId")
                         .IsUnique();
 
-                    b.ToTable("StockLevels");
+                    b.ToTable("StockLevels", t =>
+                        {
+                            t.HasCheckConstraint("CK_StockLevels_Qty_NotNegative", "Qty >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TechShop.Domain.Entities.StockMovement", b =>
